@@ -9,12 +9,12 @@ CLOUD_CONFIG_PATH = File.join(File.dirname(__FILE__), "user-data")
 CONFIG = File.join(File.dirname(__FILE__), "config.rb")
 
 # Defaults for config options defined in CONFIG
-$num_instances = 1
-$update_channel = "alpha"
+$num_instances = 3
+$update_channel = "stable"
 $enable_serial_logging = false
 $vb_gui = false
-$vb_memory = 1024
-$vb_cpus = 1
+$vb_memory = 2014
+$vb_cpus = 2
 
 # Attempt to apply the deprecated environment variable NUM_INSTANCES to
 # $num_instances while allowing config.rb to override it
@@ -72,7 +72,7 @@ Vagrant.configure("2") do |config|
       end
 
       if $expose_docker_tcp
-        config.vm.network "forwarded_port", guest: 2375, host: ($expose_docker_tcp + i - 1), auto_correct: true
+        config.vm.network "forwarded_port", guest: 2375, host: ($expose_docker_tcp + i - 1), auto_correct: false
       end
 
       config.vm.provider :vmware_fusion do |vb|
@@ -85,17 +85,18 @@ Vagrant.configure("2") do |config|
         vb.cpus = $vb_cpus
       end
 
-      ip = "172.17.8.#{i+100}"
-      config.vm.network :private_network, ip: ip
+      ip = "10.243.12.#{i+9}"
+      config.vm.network :private_network, ip: ip, auto_config: true
 
-      # Uncomment below to enable NFS for sharing the host machine into the coreos-vagrant VM.
-      #config.vm.synced_folder ".", "/home/core/share", id: "core", :nfs => true, :mount_options => ['nolock,vers=3,udp']
-
-      if File.exist?(CLOUD_CONFIG_PATH)
-        config.vm.provision :file, :source => "#{CLOUD_CONFIG_PATH}", :destination => "/tmp/vagrantfile-user-data"
-        config.vm.provision :shell, :inline => "mv /tmp/vagrantfile-user-data /var/lib/coreos-vagrant/", :privileged => true
+      config.vm.provider :virtualbox do |vb, override|
+        vb.customize ['modifyvm', :id, '--nicpromisc2', 'allow-all', '--nictype2', 'Am79C973']
       end
 
+      cloud_config_file = CLOUD_CONFIG_PATH + ("-%02d" % i)
+       if File.exist?(cloud_config_file)
+         config.vm.provision :file, :source => "#{cloud_config_file}", :destination => "/tmp/vagrantfile-user-data"
+         config.vm.provision :shell, :inline => "mv /tmp/vagrantfile-user-data /var/lib/coreos-vagrant/", :privileged => true
+       end
     end
   end
 end
